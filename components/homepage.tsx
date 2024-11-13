@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa'
@@ -33,19 +33,22 @@ const timeframes: Timeframe[] = [
 
 const games = ['Blackjack', 'Roulette', 'Slots', 'Poker', 'Baccarat']
 
-const REFRESH_INTERVAL = 20000 // 10 seconds
-
 export default function StakeStats() {
   const [timeframe, setTimeframe] = useState<string>('overall')
   const [stats, setStats] = useState<GameStats | null>(null)
-  const [previousStats, setPreviousStats] = useState<GameStats | null>(null)
   const [selectedGame, setSelectedGame] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
   const [activeTab, setActiveTab] = useState<string>('overall')
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState<number>(0)
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (isInitialFetch: boolean = false) => {
+    if (isTransitioning) return
+
+    if (isInitialFetch) {
+      setLoading(true)
+    }
     setError(null)
     
     try {
@@ -71,9 +74,22 @@ export default function StakeStats() {
         throw new Error('Invalid data format received')
       }
 
-      // Store current stats as previous before updating
-      setPreviousStats(stats)
-      setStats(data as GameStats)
+      setStats((prevStats) => {
+        if (prevStats && !isInitialFetch) {
+          return {
+            ...prevStats,
+            ...Object.fromEntries(
+              Object.entries(data).map(([key, value]) => [
+                key,
+                typeof value === 'number' && typeof prevStats[key as keyof GameStats] === 'number'
+                  ? (prevStats[key as keyof GameStats] as number) + ((value as number) - (prevStats[key as keyof GameStats] as number)) * 0.1
+                  : value
+              ])
+            )
+          } as GameStats
+        }
+        return data as GameStats
+      })
       setError(null)
       setRetryCount(0)
     } catch (err) {
@@ -83,35 +99,41 @@ export default function StakeStats() {
       if (retryCount < 3) {
         setTimeout(() => {
           setRetryCount(prev => prev + 1)
-          fetchStats()
         }, 2000 * (retryCount + 1))
       }
     } finally {
-      setLoading(false)
+      if (isInitialFetch) {
+        setLoading(false)
+      }
     }
-  }, [timeframe, selectedGame, activeTab, retryCount, stats])
+  }, [timeframe, selectedGame, activeTab, retryCount, isTransitioning])
 
-  // Initial fetch and refresh interval
   useEffect(() => {
-    fetchStats()
-    const intervalId = setInterval(fetchStats, REFRESH_INTERVAL)
+    fetchStats(true)
+
+    const intervalId = setInterval(() => fetchStats(false), 10000) // Update every 10 seconds
+
     return () => clearInterval(intervalId)
   }, [fetchStats])
 
-  // Handle timeframe changes with smooth transition
   const handleTimeframeChange = (newTimeframe: string) => {
-    setLoading(true)
-    setPreviousStats(stats) // Store current stats for transition
+    setIsTransitioning(true)
     setTimeframe(newTimeframe)
-    fetchStats()
+    setStats(null) // Clear previous stats
+    setTimeout(() => {
+      setIsTransitioning(false)
+      fetchStats(true) // Fetch new stats
+    }, 1500)
   }
 
-  // Handle game changes with smooth transition
   const handleGameChange = (newGame: string) => {
-    setLoading(true)
-    setPreviousStats(stats) // Store current stats for transition
+    setIsTransitioning(true)
     setSelectedGame(newGame)
-    fetchStats()
+    setStats(null) // Clear previous stats
+    setTimeout(() => {
+      setIsTransitioning(false)
+      fetchStats(true) // Fetch new stats
+    }, 1500)
   }
 
   return (
@@ -127,7 +149,7 @@ export default function StakeStats() {
           <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
             Stake.com Statistics
           </h1>
-          <p className="text-gray-400">Real-time gaming analytics</p>
+          <p className="text-gray-400">Unveiling the truth behind the numbers</p>
         </motion.div>
 
         <Tabs defaultValue="overall" className="w-full" onValueChange={setActiveTab}>
@@ -156,13 +178,13 @@ export default function StakeStats() {
                   timeframe={timeframe}
                   setTimeframe={handleTimeframeChange}
                   stats={stats}
-                  previousStats={previousStats}
                   selectedGame={selectedGame}
                   setSelectedGame={handleGameChange}
                   activeTab={activeTab}
                   loading={loading}
                   error={error}
                   retryCount={retryCount}
+                  isTransitioning={isTransitioning}
                 />
               )}
               {activeTab === 'help' && <InfoCard title="Help & Support" icon={FaQuestionCircle} />}
@@ -175,7 +197,6 @@ export default function StakeStats() {
     </div>
   )
 }
-
 
 function AnimatedBackground() {
   return (
@@ -191,113 +212,104 @@ interface StatsSectionProps {
   timeframe: string
   setTimeframe: (timeframe: string) => void
   stats: GameStats | null
-  previousStats: GameStats | null
   selectedGame: string
   setSelectedGame: (game: string) => void
   activeTab: string
   loading: boolean
   error: string | null
   retryCount: number
+  isTransitioning: boolean
 }
 
 function StatsSection({
   timeframe,
   setTimeframe,
   stats,
-  previousStats,
   selectedGame,
   setSelectedGame,
   activeTab,
   loading,
   error,
-  retryCount
+  retryCount,
+  isTransitioning
 }: StatsSectionProps) {
-  
-   // Use previous stats during loading for smooth transition
-   const displayStats = loading && previousStats ? previousStats : stats
+  return (
+    <div className="space-y-8">
+      {activeTab === 'game' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <div className="max-w-md mx-auto">
+            <Select onValueChange={setSelectedGame} value={selectedGame}>
+              <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/50 backdrop-blur-sm text-white">
+                <SelectValue placeholder="Select a game" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                {games.map((game) => (
+                  <SelectItem key={game} value={game.toLowerCase()}>
+                    {game}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </motion.div>
+      )}
 
-   return (
-     <div className="space-y-8">
-       {activeTab === 'game' && (
-         <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           className="mb-8"
-         >
-           <div className="max-w-md mx-auto">
-             <Select onValueChange={setSelectedGame} value={selectedGame}>
-               <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/50 backdrop-blur-sm text-white">
-                 <SelectValue placeholder="Select a game" />
-               </SelectTrigger>
-               <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                 {games.map((game) => (
-                   <SelectItem key={game} value={game.toLowerCase()}>
-                     {game}
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-           </div>
-         </motion.div>
-       )}
- 
-       <div className="flex justify-center space-x-4 mb-8">
-         {timeframes.map(({ value, label, icon: Icon }) => (
-           <button
-             key={value}
-             onClick={() => setTimeframe(value)}
-             disabled={loading}
-             className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-               timeframe === value
-                 ? 'bg-blue-600 text-white'
-                 : 'bg-gray-800/30 text-gray-300 hover:bg-gray-700/30'
-             } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-           >
-             <Icon className="w-4 h-4" />
-             <span>{label}</span>
-           </button>
-         ))}
-       </div>
- 
-       {error && (
-         <Alert variant="destructive" className="mb-8">
-           <AlertDescription>
-             {error}
-             {retryCount < 3 && ' Retrying...'}
-           </AlertDescription>
-         </Alert>
-       )}
- 
-       <AnimatePresence mode="wait">
-         {!displayStats ? (
-           <motion.div
-             key="loading"
-             initial={{ opacity: 0 }}
-             animate={{ opacity: 1 }}
-             exit={{ opacity: 0 }}
-             transition={{ duration: 0.3 }}
-           >
-             <LoadingState />
-           </motion.div>
-         ) : (
-           <motion.div
-             key={`stats-${timeframe}-${selectedGame}`}
-             initial={{ opacity: 0 }}
-             animate={{ opacity: 1 }}
-             exit={{ opacity: 0 }}
-             transition={{ duration: 0.3 }}
-           >
-             <StatsContent 
-               stats={displayStats} 
-               loading={loading}
-             />
-           </motion.div>
-         )}
-       </AnimatePresence>
-     </div>
-   )
- }
- 
+      <div className="flex justify-center space-x-4 mb-8">
+        {timeframes.map(({ value, label, icon: Icon }) => (
+          <button
+            key={value}
+            onClick={() => setTimeframe(value)}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+              timeframe === value
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800/30 text-gray-300 hover:bg-gray-700/30'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-8">
+          <AlertDescription>
+            {error}
+            {retryCount < 3 && ' Retrying...'}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <AnimatePresence mode="wait">
+        {loading || isTransitioning ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <LoadingState />
+          </motion.div>
+        ) : stats ? (
+          <motion.div
+            key={`stats-${timeframe}-${selectedGame}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <StatsContent stats={stats} />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 function LoadingState() {
   return (
@@ -312,16 +324,11 @@ function LoadingState() {
   )
 }
 
-interface StatsContentProps {
-  stats: GameStats
-  loading: boolean
-}
-
-function StatsContent({ stats, loading }: StatsContentProps) {
+function StatsContent({ stats }: { stats: GameStats }) {
   const winLossRatio = stats.losses > 0 ? (stats.wins / stats.losses).toFixed(2) : stats.wins > 0 ? "∞" : "0"
 
   return (
-    <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+    <>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -396,7 +403,7 @@ function StatsContent({ stats, loading }: StatsContentProps) {
           </CardContent>
         </Card>
       </motion.div>
-    </div>
+    </>
   )
 }
 
