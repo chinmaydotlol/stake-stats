@@ -31,7 +31,10 @@ const timeframes: Timeframe[] = [
   { value: 'overall', label: 'All Time', icon: FaCalendarAlt },
 ]
 
-const games = ['Blackjack', 'Roulette', 'Slots', 'Poker', 'Baccarat']
+const games = [
+  'Baccarat', 'Backjack', 'Crash', 'Diamonds', 'Dice', 'Hilo', 'Keno', 'Limbo', 
+  'Mines', 'Plinko', 'Roulette', 'Slide', 'Wheel'
+]
 
 export default function StakeStats() {
   const [timeframe, setTimeframe] = useState<string>('overall')
@@ -92,7 +95,10 @@ export default function StakeStats() {
   useEffect(() => {
     fetchStats()
 
+    const intervalId = setInterval(fetchStats, 10000) // Update every 10 seconds
+
     return () => {
+      clearInterval(intervalId)
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
@@ -300,7 +306,7 @@ function LoadingState() {
 }
 
 function StatsContent({ stats }: { stats: GameStats }) {
-  const winLossRatio = stats.losses > 0 ? (stats.wins / stats.losses).toFixed(2) : stats.wins > 0 ? "∞" : "0"
+  const winLossRatio = stats.losses > 0 ? (stats.wins / stats.losses).toFixed(2) : stats.wins > 0 ? "∞" : "0.00"
 
   return (
     <>
