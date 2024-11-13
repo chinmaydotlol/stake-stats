@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa'
@@ -31,7 +31,10 @@ const timeframes: Timeframe[] = [
   { value: 'overall', label: 'All Time', icon: FaCalendarAlt },
 ]
 
-const games = ['Blackjack', 'Roulette', 'Slots', 'Poker', 'Baccarat']
+const games = [
+  'Baccarat', 'Backjack', 'Crash', 'Diamonds', 'Dice', 'Hilo', 'Keno', 'Limbo', 
+  'Mines', 'Plinko', 'Roulette', 'Slide', 'Wheel'
+]
 
 export default function StakeStats() {
   const [timeframe, setTimeframe] = useState<string>('overall')
@@ -40,15 +43,15 @@ export default function StakeStats() {
   const [loading, setLoading] = useState<boolean>(true)
   const [activeTab, setActiveTab] = useState<string>('overall')
   const [error, setError] = useState<string | null>(null)
-  const [retryCount, setRetryCount] = useState<number>(0)
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
-  const fetchStats = useCallback(async (isInitialFetch: boolean = false) => {
-    if (isTransitioning) return
-
-    if (isInitialFetch) {
-      setLoading(true)
+  const fetchStats = useCallback(async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
     }
+    abortControllerRef.current = new AbortController()
+
+    setLoading(true)
     setError(null)
     
     try {
@@ -61,7 +64,8 @@ export default function StakeStats() {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
-        }
+        },
+        signal: abortControllerRef.current.signal
       })
 
       if (!response.ok) {
@@ -74,66 +78,52 @@ export default function StakeStats() {
         throw new Error('Invalid data format received')
       }
 
-      setStats((prevStats) => {
-        if (prevStats && !isInitialFetch) {
-          return {
-            ...prevStats,
-            ...Object.fromEntries(
-              Object.entries(data).map(([key, value]) => [
-                key,
-                typeof value === 'number' && typeof prevStats[key as keyof GameStats] === 'number'
-                  ? (prevStats[key as keyof GameStats] as number) + ((value as number) - (prevStats[key as keyof GameStats] as number)) * 0.1
-                  : value
-              ])
-            )
-          } as GameStats
-        }
-        return data as GameStats
-      })
+      setStats(data as GameStats)
       setError(null)
-      setRetryCount(0)
     } catch (err) {
-      console.error('Error fetching stats:', err)
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-      
-      if (retryCount < 3) {
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1)
-        }, 2000 * (retryCount + 1))
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Fetch aborted')
+      } else {
+        console.error('Error fetching stats:', err)
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       }
     } finally {
-      if (isInitialFetch) {
-        setLoading(false)
-      }
+      setLoading(false)
     }
-  }, [timeframe, selectedGame, activeTab, retryCount, isTransitioning])
+  }, [timeframe, selectedGame, activeTab])
 
   useEffect(() => {
-    fetchStats(true)
+    fetchStats()
 
-    const intervalId = setInterval(() => fetchStats(false), 10000) // Update every 10 seconds
+    const intervalId = setInterval(fetchStats, 10000) // Update every 10 seconds
 
-    return () => clearInterval(intervalId)
+    return () => {
+      clearInterval(intervalId)
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [fetchStats])
 
   const handleTimeframeChange = (newTimeframe: string) => {
-    setIsTransitioning(true)
     setTimeframe(newTimeframe)
-    setStats(null) // Clear previous stats
-    setTimeout(() => {
-      setIsTransitioning(false)
-      fetchStats(true) // Fetch new stats
-    }, 1500)
+    setStats(null)
+    fetchStats()
   }
 
   const handleGameChange = (newGame: string) => {
-    setIsTransitioning(true)
     setSelectedGame(newGame)
-    setStats(null) // Clear previous stats
-    setTimeout(() => {
-      setIsTransitioning(false)
-      fetchStats(true) // Fetch new stats
-    }, 1500)
+    setStats(null)
+    fetchStats()
+  }
+
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab)
+    setStats(null)
+    if (newTab === 'overall') {
+      setSelectedGame('')
+    }
+    fetchStats()
   }
 
   return (
@@ -152,7 +142,7 @@ export default function StakeStats() {
           <p className="text-gray-400">Unveiling the truth behind the numbers</p>
         </motion.div>
 
-        <Tabs defaultValue="overall" className="w-full" onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid grid-cols-5 max-w-2xl mx-auto bg-gray-800/30 backdrop-blur-sm rounded-full mb-8 p-1">
             {['overall', 'game', 'help', 'realities', 'about'].map((tab) => (
               <TabsTrigger
@@ -183,8 +173,6 @@ export default function StakeStats() {
                   activeTab={activeTab}
                   loading={loading}
                   error={error}
-                  retryCount={retryCount}
-                  isTransitioning={isTransitioning}
                 />
               )}
               {activeTab === 'help' && <InfoCard title="Help & Support" icon={FaQuestionCircle} />}
@@ -217,8 +205,6 @@ interface StatsSectionProps {
   activeTab: string
   loading: boolean
   error: string | null
-  retryCount: number
-  isTransitioning: boolean
 }
 
 function StatsSection({
@@ -230,8 +216,6 @@ function StatsSection({
   activeTab,
   loading,
   error,
-  retryCount,
-  isTransitioning
 }: StatsSectionProps) {
   return (
     <div className="space-y-8">
@@ -277,21 +261,18 @@ function StatsSection({
 
       {error && (
         <Alert variant="destructive" className="mb-8">
-          <AlertDescription>
-            {error}
-            {retryCount < 3 && ' Retrying...'}
-          </AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       <AnimatePresence mode="wait">
-        {loading || isTransitioning ? (
+        {loading ? (
           <motion.div
             key="loading"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.3 }}
           >
             <LoadingState />
           </motion.div>
@@ -301,7 +282,7 @@ function StatsSection({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.3 }}
           >
             <StatsContent stats={stats} />
           </motion.div>
