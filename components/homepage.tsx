@@ -32,7 +32,7 @@ const timeframes: Timeframe[] = [
 ]
 
 const games = [
-  'Baccarat', 'Backjack', 'Crash', 'Diamonds', 'Dice', 'Hilo', 'Keno', 'Limbo', 
+  'Baccarat', 'Blackjack', 'Crash', 'Diamonds', 'Dice', 'Hilo', 'Keno', 'Limbo', 
   'Mines', 'Plinko', 'Roulette', 'Slide', 'Wheel'
 ]
 
