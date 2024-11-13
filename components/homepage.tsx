@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa'
@@ -8,7 +8,6 @@ import { IconType } from 'react-icons'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface GameStats {
@@ -34,17 +33,19 @@ const timeframes: Timeframe[] = [
 
 const games = ['Blackjack', 'Roulette', 'Slots', 'Poker', 'Baccarat']
 
+const REFRESH_INTERVAL = 20000 // 10 seconds
+
 export default function StakeStats() {
   const [timeframe, setTimeframe] = useState<string>('overall')
   const [stats, setStats] = useState<GameStats | null>(null)
+  const [previousStats, setPreviousStats] = useState<GameStats | null>(null)
   const [selectedGame, setSelectedGame] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
   const [activeTab, setActiveTab] = useState<string>('overall')
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState<number>(0)
 
-  const fetchStats = async () => {
-    setLoading(true)
+  const fetchStats = useCallback(async () => {
     setError(null)
     
     try {
@@ -70,34 +71,48 @@ export default function StakeStats() {
         throw new Error('Invalid data format received')
       }
 
-      setStats(data)
+      // Store current stats as previous before updating
+      setPreviousStats(stats)
+      setStats(data as GameStats)
       setError(null)
-      setRetryCount(0) // Reset retry count on successful fetch
+      setRetryCount(0)
     } catch (err) {
       console.error('Error fetching stats:', err)
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-      setStats(null)
       
-      // Implement retry logic
       if (retryCount < 3) {
         setTimeout(() => {
           setRetryCount(prev => prev + 1)
-        }, 2000 * (retryCount + 1)) // Exponential backoff
+          fetchStats()
+        }, 2000 * (retryCount + 1))
       }
     } finally {
       setLoading(false)
     }
-  }
+  }, [timeframe, selectedGame, activeTab, retryCount, stats])
 
+  // Initial fetch and refresh interval
   useEffect(() => {
     fetchStats()
-
-    // Set up real-time updates every 5 seconds
-    const intervalId = setInterval(fetchStats, 5000)
-
-    // Clean up the interval on component unmount
+    const intervalId = setInterval(fetchStats, REFRESH_INTERVAL)
     return () => clearInterval(intervalId)
-  }, [timeframe, selectedGame, activeTab, retryCount])
+  }, [fetchStats])
+
+  // Handle timeframe changes with smooth transition
+  const handleTimeframeChange = (newTimeframe: string) => {
+    setLoading(true)
+    setPreviousStats(stats) // Store current stats for transition
+    setTimeframe(newTimeframe)
+    fetchStats()
+  }
+
+  // Handle game changes with smooth transition
+  const handleGameChange = (newGame: string) => {
+    setLoading(true)
+    setPreviousStats(stats) // Store current stats for transition
+    setSelectedGame(newGame)
+    fetchStats()
+  }
 
   return (
     <div className="min-h-screen bg-[#050505] text-white overflow-hidden relative">
@@ -112,7 +127,7 @@ export default function StakeStats() {
           <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
             Stake.com Statistics
           </h1>
-          <p className="text-gray-400">Unveiling the truth behind the numbers</p>
+          <p className="text-gray-400">Real-time gaming analytics</p>
         </motion.div>
 
         <Tabs defaultValue="overall" className="w-full" onValueChange={setActiveTab}>
@@ -139,10 +154,11 @@ export default function StakeStats() {
               {(activeTab === 'overall' || activeTab === 'game') && (
                 <StatsSection
                   timeframe={timeframe}
-                  setTimeframe={setTimeframe}
+                  setTimeframe={handleTimeframeChange}
                   stats={stats}
+                  previousStats={previousStats}
                   selectedGame={selectedGame}
-                  setSelectedGame={setSelectedGame}
+                  setSelectedGame={handleGameChange}
                   activeTab={activeTab}
                   loading={loading}
                   error={error}
@@ -160,6 +176,7 @@ export default function StakeStats() {
   )
 }
 
+
 function AnimatedBackground() {
   return (
     <div className="fixed inset-0 z-0">
@@ -174,6 +191,7 @@ interface StatsSectionProps {
   timeframe: string
   setTimeframe: (timeframe: string) => void
   stats: GameStats | null
+  previousStats: GameStats | null
   selectedGame: string
   setSelectedGame: (game: string) => void
   activeTab: string
@@ -186,6 +204,7 @@ function StatsSection({
   timeframe,
   setTimeframe,
   stats,
+  previousStats,
   selectedGame,
   setSelectedGame,
   activeTab,
@@ -193,91 +212,116 @@ function StatsSection({
   error,
   retryCount
 }: StatsSectionProps) {
-  return (
-    <div className="space-y-8">
-      {activeTab === 'game' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <div className="max-w-md mx-auto">
-            <Select onValueChange={setSelectedGame} value={selectedGame}>
-              <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/50 backdrop-blur-sm text-white">
-                <SelectValue placeholder="Select a game" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                {games.map((game) => (
-                  <SelectItem key={game} value={game.toLowerCase()}>
-                    {game}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </motion.div>
-      )}
+  
+   // Use previous stats during loading for smooth transition
+   const displayStats = loading && previousStats ? previousStats : stats
 
-      <div className="flex justify-center space-x-4 mb-8">
-        {timeframes.map(({ value, label, icon: Icon }) => (
-          <button
-            key={value}
-            onClick={() => setTimeframe(value)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-              timeframe === value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800/30 text-gray-300 hover:bg-gray-700/30'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span>{label}</span>
-          </button>
-        ))}
-      </div>
-
-      {error && (
-        <Alert variant="destructive" className="mb-8">
-          <AlertDescription>
-            {error}
-            {retryCount < 3 && ' Retrying...'}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {loading ? (
-        <LoadingState />
-      ) : stats ? (
-        <StatsContent stats={stats} />
-      ) : null}
-    </div>
-  )
-}
+   return (
+     <div className="space-y-8">
+       {activeTab === 'game' && (
+         <motion.div
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="mb-8"
+         >
+           <div className="max-w-md mx-auto">
+             <Select onValueChange={setSelectedGame} value={selectedGame}>
+               <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/50 backdrop-blur-sm text-white">
+                 <SelectValue placeholder="Select a game" />
+               </SelectTrigger>
+               <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                 {games.map((game) => (
+                   <SelectItem key={game} value={game.toLowerCase()}>
+                     {game}
+                   </SelectItem>
+                 ))}
+               </SelectContent>
+             </Select>
+           </div>
+         </motion.div>
+       )}
+ 
+       <div className="flex justify-center space-x-4 mb-8">
+         {timeframes.map(({ value, label, icon: Icon }) => (
+           <button
+             key={value}
+             onClick={() => setTimeframe(value)}
+             disabled={loading}
+             className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+               timeframe === value
+                 ? 'bg-blue-600 text-white'
+                 : 'bg-gray-800/30 text-gray-300 hover:bg-gray-700/30'
+             } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+           >
+             <Icon className="w-4 h-4" />
+             <span>{label}</span>
+           </button>
+         ))}
+       </div>
+ 
+       {error && (
+         <Alert variant="destructive" className="mb-8">
+           <AlertDescription>
+             {error}
+             {retryCount < 3 && ' Retrying...'}
+           </AlertDescription>
+         </Alert>
+       )}
+ 
+       <AnimatePresence mode="wait">
+         {!displayStats ? (
+           <motion.div
+             key="loading"
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             transition={{ duration: 0.3 }}
+           >
+             <LoadingState />
+           </motion.div>
+         ) : (
+           <motion.div
+             key={`stats-${timeframe}-${selectedGame}`}
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             transition={{ duration: 0.3 }}
+           >
+             <StatsContent 
+               stats={displayStats} 
+               loading={loading}
+             />
+           </motion.div>
+         )}
+       </AnimatePresence>
+     </div>
+   )
+ }
+ 
 
 function LoadingState() {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-32 bg-gray-800/30" />
+          <div key={i} className="h-32 bg-gray-800/30 rounded-lg animate-pulse" />
         ))}
       </div>
-      <Skeleton className="h-96 bg-gray-800/30" />
+      <div className="h-96 bg-gray-800/30 rounded-lg animate-pulse" />
     </div>
   )
 }
 
-function StatsContent({ stats }: { stats: GameStats }) {
-  const prevStatsRef = useRef<GameStats>(stats)
+interface StatsContentProps {
+  stats: GameStats
+  loading: boolean
+}
 
-  useEffect(() => {
-    prevStatsRef.current = stats
-  }, [stats])
-
-  // Calculate win/loss ratio, handling division by zero
+function StatsContent({ stats, loading }: StatsContentProps) {
   const winLossRatio = stats.losses > 0 ? (stats.wins / stats.losses).toFixed(2) : stats.wins > 0 ? "∞" : "0"
 
   return (
-    <>
+    <div className={`transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -287,13 +331,11 @@ function StatsContent({ stats }: { stats: GameStats }) {
         <StatCard
           title="Games Played"
           value={stats.gamesPlayed}
-          prevValue={prevStatsRef.current.gamesPlayed}
           icon={FaDice}
         />
         <StatCard
           title="Wins"
           value={stats.wins}
-          prevValue={prevStatsRef.current.wins}
           percentage={stats.winPercentage}
           icon={FaChartLine}
           trend="up"
@@ -301,7 +343,6 @@ function StatsContent({ stats }: { stats: GameStats }) {
         <StatCard
           title="Losses"
           value={stats.losses}
-          prevValue={prevStatsRef.current.losses}
           percentage={stats.lossPercentage}
           icon={FaChartLine}
           trend="down"
@@ -309,13 +350,6 @@ function StatsContent({ stats }: { stats: GameStats }) {
         <StatCard
           title="Win/Loss Ratio"
           value={winLossRatio}
-          prevValue={
-            prevStatsRef.current.losses > 0
-              ? (prevStatsRef.current.wins / prevStatsRef.current.losses).toFixed(2)
-              : prevStatsRef.current.wins > 0
-              ? "∞"
-              : "0"
-          }
           icon={FaChartLine}
         />
       </motion.div>
@@ -362,21 +396,19 @@ function StatsContent({ stats }: { stats: GameStats }) {
           </CardContent>
         </Card>
       </motion.div>
-    </>
+    </div>
   )
 }
-
 
 interface StatCardProps {
   title: string
   value: number | string
-  prevValue?: number | string
   percentage?: number
   icon: IconType
   trend?: 'up' | 'down'
 }
 
-function StatCard({ title, value, prevValue, percentage, icon: Icon, trend }: StatCardProps) {
+function StatCard({ title, value, percentage, icon: Icon, trend }: StatCardProps) {
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
