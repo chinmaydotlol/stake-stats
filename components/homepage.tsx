@@ -95,7 +95,7 @@ export default function StakeStats() {
   useEffect(() => {
     fetchStats()
 
-    const intervalId = setInterval(fetchStats, 35000) // Update every 10 seconds
+    const intervalId = setInterval(fetchStats, 20000) // Update every 10 seconds
 
     return () => {
       clearInterval(intervalId)
