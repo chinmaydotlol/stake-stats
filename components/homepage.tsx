@@ -95,7 +95,7 @@ export default function StakeStats() {
   useEffect(() => {
     fetchStats()
 
-    const intervalId = setInterval(fetchStats, 20000) // Update every 10 seconds
+    const intervalId = setInterval(fetchStats, 30000) // Update every 20 seconds
 
     return () => {
       clearInterval(intervalId)
@@ -364,13 +364,11 @@ function StatsContent({ stats }: { stats: GameStats }) {
                   <XAxis dataKey="name" stroke="#fff" />
                   <YAxis stroke="#fff" />
                   <Tooltip
-                    contentStyle={{ background: 'rgba(0, 0, 0, 0.8)', border: 'none' }}
+                    contentStyle={{ background: 'rgba(39, 114, 245, 0.8)', border: 'none' }}
                     labelStyle={{ color: '#fff' }}
                   />
-                  <Bar
-                    dataKey="value"
-                    fill="url(#barGradient)"
-                    radius={[4, 4, 0, 0]}
+                 <Bar dataKey="value" fill="#4F46E5" radius={[4, 4, 0, 0]} 
+
                   />
                   <defs>
                     <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
@@ -459,3 +457,4 @@ function InfoCard({ title, icon: Icon }: InfoCardProps) {
     </motion.div>
   )
 }
+
