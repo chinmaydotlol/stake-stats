@@ -187,6 +187,88 @@ export default function StakeStats() {
   )
 }
 
+function useSlotMachineNumber(targetValue: number) {
+  const [displayValue, setDisplayValue] = useState(0);
+  const previousValue = useRef(targetValue);
+  const frameRef = useRef<number>();
+
+  useEffect(() => {
+    if (targetValue === previousValue.current) return;
+    
+    let startValue = 0;
+    let currentStep = 0;
+    const totalSteps = 30; // Number of animation steps
+    const stepDuration = 1000 / totalSteps; // Total animation = 1 second
+    
+    const startAnimation = () => {
+      currentStep++;
+      
+      if (currentStep <= totalSteps) {
+        // During animation, show random numbers that get closer to target
+        const progress = currentStep / totalSteps;
+        const range = targetValue - startValue;
+        const randomOffset = range * (1 - progress) * Math.random();
+        const currentValue = Math.floor(startValue + (range * progress) + randomOffset);
+        
+        setDisplayValue(currentValue);
+        frameRef.current = setTimeout(startAnimation, stepDuration) as unknown as number;
+      } else {
+        // Animation complete
+        setDisplayValue(targetValue);
+      }
+    };
+
+    startAnimation();
+    previousValue.current = targetValue;
+
+    return () => {
+      if (frameRef.current) {
+        clearTimeout(frameRef.current);
+      }
+    };
+  }, [targetValue]);
+
+  return displayValue;
+}
+
+function useAnimatedNumber(value: number, duration: number = 500) {
+  const [current, setCurrent] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
+  const frameRef = useRef<number>();
+
+  useEffect(() => {
+    startTimeRef.current = null;
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+    }
+
+    const animate = (timestamp: number) => {
+      if (!startTimeRef.current) {
+        startTimeRef.current = timestamp;
+      }
+
+      const progress = (timestamp - startTimeRef.current) / duration;
+
+      if (progress < 1) {
+        setCurrent(Math.floor(value * progress));
+        frameRef.current = requestAnimationFrame(animate);
+      } else {
+        setCurrent(value);
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, [value, duration]);
+
+  return current;
+}
+
 function AnimatedBackground() {
   return (
     <div className="fixed inset-0 z-0">
@@ -327,7 +409,14 @@ function LoadingState() {
 }
 
 function StatsContent({ stats }: { stats: GameStats }) {
-  const winLossRatio = stats.losses > 0 ? (stats.wins / stats.losses).toFixed(2) : stats.wins > 0 ? "∞" : "0.00"
+  // Calculate win/loss ratio with proper handling of edge cases
+  const winLossRatio = (() => {
+    if (stats.losses === 0) {
+      return stats.wins > 0 ? "∞" : "0.00";
+    }
+    const ratio = stats.wins / stats.losses;
+    return ratio.toFixed(2);
+  })();
 
   return (
     <>
@@ -443,40 +532,27 @@ interface StatCardProps {
 }
 
 function StatCard({ title, value, percentage, icon: Icon, trend }: StatCardProps) {
+  const isNumber = typeof value === 'number';
+  const displayValue = useSlotMachineNumber(isNumber ? Number(value) : 0);
+
   return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-    >
-      <Card className="bg-gray-800/30 border-gray-700/50 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-gray-300">{title}</CardTitle>
-          <Icon className={`w-4 h-4 ${
-            trend === 'up' ? 'text-green-400' :
-            trend === 'down' ? 'text-red-400' :
-            'text-gray-400'
-          }`} />
-        </CardHeader>
-        <CardContent>
-          <motion.div
-            key={value}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="text-2xl font-bold text-white"
-          >
-            {value}
-          </motion.div>
-          {percentage !== undefined && (
-            <p className="text-xs text-gray-400">
-              {typeof percentage === 'number' ? `${percentage.toFixed(2)}%` : `${percentage}%`} rate
-            </p>
-          )}
-        </CardContent>
-        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-30" />
-      </Card>
-    </motion.div>
-  )
+    <Card className="bg-gray-800/30 border-gray-700/50 backdrop-blur-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-white">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-gray-400" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-white font-mono tabular-nums">
+          {isNumber ? displayValue.toLocaleString() : value}
+        </div>
+        {percentage !== undefined && (
+          <p className={`text-xs ${trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+            {trend === 'up' ? '+' : '-'}{percentage}%
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 interface InfoCardProps {
