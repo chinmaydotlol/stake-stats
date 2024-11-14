@@ -195,10 +195,10 @@ function useSlotMachineNumber(targetValue: number) {
   useEffect(() => {
     if (targetValue === previousValue.current) return;
     
-    let startValue = 0;
+    const startValue = 0;
     let currentStep = 0;
     const totalSteps = 30; // Number of animation steps
-    const stepDuration = 1000 / totalSteps; // Total animation = 1 second
+    const stepDuration = 2000 / totalSteps; // Total animation = 1 second
     
     const startAnimation = () => {
       currentStep++;
@@ -231,43 +231,6 @@ function useSlotMachineNumber(targetValue: number) {
   return displayValue;
 }
 
-function useAnimatedNumber(value: number, duration: number = 500) {
-  const [current, setCurrent] = useState(0);
-  const startTimeRef = useRef<number | null>(null);
-  const frameRef = useRef<number>();
-
-  useEffect(() => {
-    startTimeRef.current = null;
-    if (frameRef.current) {
-      cancelAnimationFrame(frameRef.current);
-    }
-
-    const animate = (timestamp: number) => {
-      if (!startTimeRef.current) {
-        startTimeRef.current = timestamp;
-      }
-
-      const progress = (timestamp - startTimeRef.current) / duration;
-
-      if (progress < 1) {
-        setCurrent(Math.floor(value * progress));
-        frameRef.current = requestAnimationFrame(animate);
-      } else {
-        setCurrent(value);
-      }
-    };
-
-    frameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current);
-      }
-    };
-  }, [value, duration]);
-
-  return current;
-}
 
 function AnimatedBackground() {
   return (
