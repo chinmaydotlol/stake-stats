@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
-import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa'
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
+import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle, FaSync } from 'react-icons/fa'
 import { IconType } from 'react-icons'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -95,7 +95,7 @@ export default function StakeStats() {
   useEffect(() => {
     fetchStats()
 
-    const intervalId = setInterval(fetchStats, 30000) // Update every 20 seconds
+    const intervalId = setInterval(fetchStats, 45000) // Update every 20 seconds
 
     return () => {
       clearInterval(intervalId)
@@ -173,6 +173,7 @@ export default function StakeStats() {
                   activeTab={activeTab}
                   loading={loading}
                   error={error}
+                  fetchStats={fetchStats}
                 />
               )}
               {activeTab === 'help' && <InfoCard title="Help & Support" icon={FaQuestionCircle} />}
@@ -205,6 +206,7 @@ interface StatsSectionProps {
   activeTab: string
   loading: boolean
   error: string | null
+  fetchStats: () => Promise<void>
 }
 
 function StatsSection({
@@ -216,7 +218,12 @@ function StatsSection({
   activeTab,
   loading,
   error,
+  fetchStats
 }: StatsSectionProps) {
+  const handleRefresh = async () => {
+    await fetchStats();
+  };
+
   return (
     <div className="space-y-8">
       {activeTab === 'game' && (
@@ -242,21 +249,35 @@ function StatsSection({
         </motion.div>
       )}
 
-      <div className="flex justify-center space-x-4 mb-8">
-        {timeframes.map(({ value, label, icon: Icon }) => (
-          <button
-            key={value}
-            onClick={() => setTimeframe(value)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-              timeframe === value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800/30 text-gray-300 hover:bg-gray-700/30'
+      <div className="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-4 mb-8">
+        <div className="flex justify-center space-x-4">
+          {timeframes.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setTimeframe(value)}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+                timeframe === value
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800/30 text-gray-300 hover:bg-gray-700/30'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={loading}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all 
+            ${loading 
+              ? 'bg-gray-700/30 text-gray-500 cursor-not-allowed' 
+              : 'bg-gray-800/30 text-gray-300 hover:bg-gray-700/30'
             }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span>{label}</span>
-          </button>
-        ))}
+        >
+          <FaSync className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+        </button>
       </div>
 
       {error && (
@@ -354,30 +375,57 @@ function StatsContent({ stats }: { stats: GameStats }) {
           </CardHeader>
           <CardContent>
             <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={[
-                    { name: 'Wins', value: stats.wins },
-                    { name: 'Losses', value: stats.losses }
-                  ]}
-                >
-                  <XAxis dataKey="name" stroke="#fff" />
-                  <YAxis stroke="#fff" />
-                  <Tooltip
-                    contentStyle={{ background: 'rgba(39, 114, 245, 0.8)', border: 'none' }}
-                    labelStyle={{ color: '#fff' }}
-                  />
-                 <Bar dataKey="value" fill="#4F46E5" radius={[4, 4, 0, 0]} 
-
-                  />
-                  <defs>
-                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.8} />
-                      <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.2} />
-                    </linearGradient>
-                  </defs>
-                </BarChart>
-              </ResponsiveContainer>
+              {stats && stats.wins !== null && stats.losses !== null && (
+                <>
+                  {console.log('Chart Data:', { wins: stats.wins, losses: stats.losses })}
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: 'Wins', value: parseInt(String(stats.wins)) },
+                        { name: 'Losses', value: parseInt(String(stats.losses)) }
+                      ]}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
+                      <XAxis 
+                        dataKey="name" 
+                        stroke="#fff"
+                        axisLine={{ stroke: '#ffffff44' }}
+                        tickLine={{ stroke: '#ffffff44' }}
+                      />
+                      <YAxis 
+                        stroke="#fff"
+                        axisLine={{ stroke: '#ffffff44' }}
+                        tickLine={{ stroke: '#ffffff44' }}
+                        domain={[0, 'auto']}
+                      />
+                      <Tooltip
+                        contentStyle={{ background: 'rgba(39, 114, 245, 0.8)', border: 'none' }}
+                        labelStyle={{ color: '#fff' }}
+                        cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                        formatter={(value) => [parseInt(String(value)), 'Count']}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        fill="url(#barGradient)"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={100}
+                      />
+                      <defs>
+                        <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.8} />
+                          <stop offset="100%" stopColor="#4F46E5" stopOpacity={0.2} />
+                        </linearGradient>
+                      </defs>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </>
+              )}
+              {(!stats || stats.wins === null || stats.losses === null) && (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  No data available
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
