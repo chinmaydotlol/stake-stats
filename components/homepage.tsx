@@ -1,14 +1,16 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, animate } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle, FaSync } from 'react-icons/fa'
+import { FaHome, FaTelegram, FaYoutube, FaTwitter } from 'react-icons/fa'
 import { IconType } from 'react-icons'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import Link from 'next/link'
 
 interface GameStats {
   wins: number
@@ -35,6 +37,41 @@ const games = [
   'Baccarat', 'Blackjack', 'Crash', 'Diamonds', 'Dice', 'Hilo', 'Keno', 'Limbo', 
   'Mines', 'Plinko', 'Roulette', 'Slide', 'Wheel'
 ]
+
+function AnimatedNumber({ value, isRatio = false }: { value: number | string, isRatio?: boolean }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    // Convert string numbers with commas to numbers
+    const targetValue = typeof value === 'string' ? 
+      Number(value.replace(/,/g, '')) : 
+      Number(value);
+
+    if (isNaN(targetValue)) return;
+
+    let startTimestamp: number;
+    const duration = 1500;
+    
+    const animate = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      
+      const currentValue = progress * targetValue;
+      setDisplayValue(currentValue);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [value]);
+
+  if (isRatio) {
+    return <span>{displayValue.toFixed(2)}</span>;
+  }
+  return <span>{Math.round(displayValue).toLocaleString()}</span>;
+}
 
 export default function StakeStats() {
   const [timeframe, setTimeframe] = useState<string>('overall')
@@ -95,7 +132,7 @@ export default function StakeStats() {
   useEffect(() => {
     fetchStats()
 
-    const intervalId = setInterval(fetchStats, 45000) // Update every 20 seconds
+    const intervalId = setInterval(fetchStats, 60000) // Update every 45 seconds
 
     return () => {
       clearInterval(intervalId)
@@ -182,55 +219,11 @@ export default function StakeStats() {
             </motion.div>
           </AnimatePresence>
         </Tabs>
+        <BottomNav />
       </div>
     </div>
   )
 }
-
-function useSlotMachineNumber(targetValue: number) {
-  const [displayValue, setDisplayValue] = useState(0);
-  const previousValue = useRef(targetValue);
-  const frameRef = useRef<number>();
-
-  useEffect(() => {
-    if (targetValue === previousValue.current) return;
-    
-    const startValue = 0;
-    let currentStep = 0;
-    const totalSteps = 30; // Number of animation steps
-    const stepDuration = 2000 / totalSteps; // Total animation = 1 second
-    
-    const startAnimation = () => {
-      currentStep++;
-      
-      if (currentStep <= totalSteps) {
-        // During animation, show random numbers that get closer to target
-        const progress = currentStep / totalSteps;
-        const range = targetValue - startValue;
-        const randomOffset = range * (1 - progress) * Math.random();
-        const currentValue = Math.floor(startValue + (range * progress) + randomOffset);
-        
-        setDisplayValue(currentValue);
-        frameRef.current = setTimeout(startAnimation, stepDuration) as unknown as number;
-      } else {
-        // Animation complete
-        setDisplayValue(targetValue);
-      }
-    };
-
-    startAnimation();
-    previousValue.current = targetValue;
-
-    return () => {
-      if (frameRef.current) {
-        clearTimeout(frameRef.current);
-      }
-    };
-  }, [targetValue]);
-
-  return displayValue;
-}
-
 
 function AnimatedBackground() {
   return (
@@ -373,13 +366,30 @@ function LoadingState() {
 
 function StatsContent({ stats }: { stats: GameStats }) {
   // Calculate win/loss ratio with proper handling of edge cases
-  const winLossRatio = (() => {
-    if (stats.losses === 0) {
-      return stats.wins > 0 ? "∞" : "0.00";
+  const calculateWinLossRatio = (wins: number, losses: number): number => {
+    console.log('Raw wins:', wins, 'Raw losses:', losses);
+    
+    // Convert string numbers with commas to actual numbers if needed
+    const cleanWins = typeof wins === 'string' ? parseInt(wins.replace(/,/g, '')) : wins;
+    const cleanLosses = typeof losses === 'string' ? parseInt(losses.replace(/,/g, '')) : losses;
+    
+    console.log('Cleaned wins:', cleanWins, 'Cleaned losses:', cleanLosses);
+
+    if (cleanLosses === 0) {
+      return cleanWins > 0 ? 999.99 : 0;
     }
-    const ratio = stats.wins / stats.losses;
-    return ratio.toFixed(2);
-  })();
+    
+    const ratio = cleanWins / cleanLosses;
+    console.log('Calculated ratio:', ratio);
+    return Number(ratio.toFixed(2));
+  };
+
+  const gamesPlayed = stats?.gamesPlayed || 0;
+  const wins = stats?.wins || 0;
+  const losses = stats?.losses || 0;
+  const winLossRatio = calculateWinLossRatio(wins, losses);
+
+  console.log('Final ratio:', winLossRatio);
 
   return (
     <>
@@ -391,20 +401,20 @@ function StatsContent({ stats }: { stats: GameStats }) {
       >
         <StatCard
           title="Games Played"
-          value={stats.gamesPlayed}
+          value={gamesPlayed}
           icon={FaDice}
         />
         <StatCard
           title="Wins"
-          value={stats.wins}
-          percentage={stats.winPercentage}
+          value={wins}
+          percentage={stats?.winPercentage}
           icon={FaChartLine}
           trend="up"
         />
         <StatCard
           title="Losses"
-          value={stats.losses}
-          percentage={stats.lossPercentage}
+          value={losses}
+          percentage={stats?.lossPercentage}
           icon={FaChartLine}
           trend="down"
         />
@@ -412,6 +422,7 @@ function StatsContent({ stats }: { stats: GameStats }) {
           title="Win/Loss Ratio"
           value={winLossRatio}
           icon={FaChartLine}
+          isRatio={true}
         />
       </motion.div>
 
@@ -492,12 +503,10 @@ interface StatCardProps {
   percentage?: number
   icon: IconType
   trend?: 'up' | 'down'
+  isRatio?: boolean
 }
 
-function StatCard({ title, value, percentage, icon: Icon, trend }: StatCardProps) {
-  const isNumber = typeof value === 'number';
-  const displayValue = useSlotMachineNumber(isNumber ? Number(value) : 0);
-
+function StatCard({ title, value, percentage, icon: Icon, trend, isRatio }: StatCardProps) {
   return (
     <Card className="bg-gray-800/30 border-gray-700/50 backdrop-blur-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -506,7 +515,7 @@ function StatCard({ title, value, percentage, icon: Icon, trend }: StatCardProps
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold text-white font-mono tabular-nums">
-          {isNumber ? displayValue.toLocaleString() : value}
+          <AnimatedNumber value={value} isRatio={isRatio} />
         </div>
         {percentage !== undefined && (
           <p className={`text-xs ${trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
@@ -545,3 +554,27 @@ function InfoCard({ title, icon: Icon }: InfoCardProps) {
   )
 }
 
+function BottomNav() {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 flex justify-center pb-6 pointer-events-none">
+      <div className="bg-gray-800/30 backdrop-blur-sm rounded-full p-3 flex items-center space-x-6 pointer-events-auto">
+        <Link href="/" className="text-white hover:text-gray-300 transition-colors p-2">
+          <FaHome className="w-6 h-6" />
+          <span className="sr-only">Home</span>
+        </Link>
+        <Link href="https://t.me/yourgroup" className="text-white hover:text-gray-300 transition-colors p-2">
+          <FaTelegram className="w-6 h-6" />
+          <span className="sr-only">Telegram</span>
+        </Link>
+        <Link href="https://www.youtube.com/c/yourchannel" className="text-white hover:text-gray-300 transition-colors p-2">
+          <FaYoutube className="w-6 h-6" />
+          <span className="sr-only">YouTube</span>
+        </Link>
+        <Link href="https://twitter.com/yourhandle" className="text-white hover:text-gray-300 transition-colors p-2">
+          <FaTwitter className="w-6 h-6" />
+          <span className="sr-only">Twitter</span>
+        </Link>
+      </div>
+    </div>
+  )
+}
