@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import Link from 'next/link'
+import { FloatingDock } from "@/components/ui/floating-dock"
 
 interface GameStats {
   wins: number
@@ -402,7 +403,7 @@ function StatsSection({
         <button
           onClick={exportData}
           disabled={exportLoading}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-blue-500/25 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
         >
           <FaDownload className={`w-4 h-4 ${exportLoading ? 'animate-spin' : ''}`} />
           <span>{exportLoading ? 'Exporting...' : 'Export All Data'}</span>
@@ -646,26 +647,36 @@ function InfoCard({ title, value, icon: Icon, isRatio = false }: InfoCardProps) 
 }
 
 function BottomNav() {
+  const navItems = [
+    {
+      title: "Home",
+      href: "/",
+      icon: <FaHome className="h-full w-full text-white" />,
+    },
+    {
+      title: "Telegram",
+      href: "https://t.me/yourgroup",
+      icon: <FaTelegram className="h-full w-full text-white" />,
+    },
+    {
+      title: "YouTube",
+      href: "https://www.youtube.com/c/yourchannel",
+      icon: <FaYoutube className="h-full w-full text-white" />,
+    },
+    {
+      title: "Twitter",
+      href: "https://twitter.com/yourhandle",
+      icon: <FaTwitter className="h-full w-full text-white" />,
+    },
+  ];
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 flex justify-center pb-6 pointer-events-none">
-      <div className="bg-gray-800/30 backdrop-blur-sm rounded-full p-3 flex items-center space-x-6 pointer-events-auto">
-        <Link href="/" className="text-white hover:text-gray-300 transition-colors p-2">
-          <FaHome className="w-6 h-6" />
-          <span className="sr-only">Home</span>
-        </Link>
-        <Link href="https://t.me/yourgroup" className="text-white hover:text-gray-300 transition-colors p-2">
-          <FaTelegram className="w-6 h-6" />
-          <span className="sr-only">Telegram</span>
-        </Link>
-        <Link href="https://www.youtube.com/c/yourchannel" className="text-white hover:text-gray-300 transition-colors p-2">
-          <FaYoutube className="w-6 h-6" />
-          <span className="sr-only">YouTube</span>
-        </Link>
-        <Link href="https://twitter.com/yourhandle" className="text-white hover:text-gray-300 transition-colors p-2">
-          <FaTwitter className="w-6 h-6" />
-          <span className="sr-only">Twitter</span>
-        </Link>
-      </div>
+    <div className="fixed bottom-0 left-0 right-0 flex justify-center pb-6">
+      <FloatingDock 
+        items={navItems}
+        desktopClassName="hidden md:flex"
+        mobileClassName="block md:hidden"
+      />
     </div>
-  )
+  );
 }
