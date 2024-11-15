@@ -403,13 +403,13 @@ function StatsSection({
         <button
           onClick={exportData}
           disabled={exportLoading}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-blue-500/25 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
         >
           <FaDownload className={`w-4 h-4 ${exportLoading ? 'animate-spin' : ''}`} />
           <span>{exportLoading ? 'Exporting...' : 'Export All Data'}</span>
         </button>
       </div>
-
+      
       {error && (
         <Alert variant="destructive" className="mb-8">
           <AlertDescription>{error}</AlertDescription>
