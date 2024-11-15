@@ -457,12 +457,12 @@ function LoadingState() {
 
 function StatsContent({ stats }: { stats: GameStats }) {
   // Calculate win/loss ratio with proper handling of edge cases
-  const calculateWinLossRatio = (wins: number, losses: number): number => {
+  const calculateWinLossRatio = (wins: number | string, losses: number | string): number => {
     console.log('Raw wins:', wins, 'Raw losses:', losses);
     
     // Convert string numbers with commas to actual numbers if needed
-    const cleanWins = typeof wins === 'string' ? parseInt(wins.replace(/,/g, '')) : wins;
-    const cleanLosses = typeof losses === 'string' ? parseInt(losses.replace(/,/g, '')) : losses;
+    const cleanWins = typeof wins === 'string' ? parseInt(wins.replace(/,/g, ''), 10) : wins;
+    const cleanLosses = typeof losses === 'string' ? parseInt(losses.replace(/,/g, ''), 10) : losses;
     
     console.log('Cleaned wins:', cleanWins, 'Cleaned losses:', cleanLosses);
 
@@ -475,9 +475,9 @@ function StatsContent({ stats }: { stats: GameStats }) {
     return Number(ratio.toFixed(2));
   };
 
-  const gamesPlayed = stats?.gamesPlayed || 0;
-  const wins = stats?.wins || 0;
-  const losses = stats?.losses || 0;
+  const gamesPlayed = stats?.gamesPlayed ?? 0;
+  const wins = stats?.wins ?? 0;
+  const losses = stats?.losses ?? 0;
   const winLossRatio = calculateWinLossRatio(wins, losses);
 
   console.log('Final ratio:', winLossRatio);
