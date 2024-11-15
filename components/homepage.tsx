@@ -53,19 +53,19 @@ function AnimatedNumber({ value, isRatio = false }: { value: number | string, is
 
     let startTimestamp: number;
     const duration = 1500;
-    
+
     const animate = (timestamp: number) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      
+
       const currentValue = progress * targetValue;
       setDisplayValue(currentValue);
-      
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       }
     };
-    
+
     requestAnimationFrame(animate);
   }, [value]);
 
@@ -92,7 +92,7 @@ export default function StakeStats() {
 
     setLoading(true)
     setError(null)
-    
+
     try {
       let endpoint = `/api/proxy/stats/${timeframe}`
       if (activeTab === 'game' && selectedGame) {
@@ -134,7 +134,7 @@ export default function StakeStats() {
   useEffect(() => {
     fetchStats()
 
-    const intervalId = setInterval(fetchStats, 60000) // Update every 60 seconds
+    const intervalId = setInterval(fetchStats, 60000) // Update every 45 seconds
 
     return () => {
       clearInterval(intervalId)
@@ -166,20 +166,61 @@ export default function StakeStats() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#050505] text-white overflow-hidden relative">
       <AnimatedBackground />
-      <div className="container mx-auto px-4 py-8 relative z-10">
-        <StatsSection
-          timeframe={timeframe}
-          setTimeframe={setTimeframe}
-          stats={stats}
-          selectedGame={selectedGame}
-          setSelectedGame={setSelectedGame}
-          activeTab={activeTab}
-          loading={loading}
-          error={error}
-          fetchStats={fetchStats}
-        />
+      <div className="relative z-10 max-w-7xl mx-auto p-8">
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-12"
+        >
+          <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+            Stake.com Statistics
+          </h1>
+          <p className="text-gray-400">Unveiling the truth behind the numbers</p>
+        </motion.div>
+
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid grid-cols-5 max-w-2xl mx-auto bg-gray-800/30 backdrop-blur-sm rounded-full mb-8 p-1">
+            {['overall', 'game', 'help', 'realities', 'about'].map((tab) => (
+              <TabsTrigger
+                key={tab}
+                value={tab}
+                className="rounded-full transition-all duration-300 text-white data-[state=active]:bg-white/10 data-[state=active]:text-white"
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {(activeTab === 'overall' || activeTab === 'game') && (
+                <StatsSection
+                  timeframe={timeframe}
+                  setTimeframe={handleTimeframeChange}
+                  stats={stats}
+                  selectedGame={selectedGame}
+                  setSelectedGame={handleGameChange}
+                  activeTab={activeTab}
+                  loading={loading}
+                  error={error}
+                  fetchStats={fetchStats}
+                />
+              )}
+              {activeTab === 'help' && <InfoCard title="Help & Support" icon={FaQuestionCircle} value={''} />}
+              {activeTab === 'realities' && <InfoCard title="Realities" icon={FaExclamationTriangle} value={''} />}
+              {activeTab === 'about' && <InfoCard title="About Us" icon={FaInfoCircle} value={''} />}
+            </motion.div>
+          </AnimatePresence>
+        </Tabs>
         <BottomNav />
       </div>
     </div>
@@ -284,7 +325,7 @@ function StatsSection({
       });
 
       const csvContent = csvRows.map(row => row.join(',')).join('\n');
-      
+
       // Create and download file
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -307,20 +348,6 @@ function StatsSection({
 
   return (
     <div className="space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
-      >
-        <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-          Stake.com Statistics
-        </h1>
-        <p className="text-gray-400 mb-2">Unveiling the truth behind the numbers</p>
-        <div className="text-sm text-gray-400 mt-4">
-          Made by <a href="https://discord.gg/v9suegvMpY" className="underline decoration-gray-400 hover:text-gray-300">nexora.dev</a> with ❤️
-        </div>
-      </motion.div>
-
       {activeTab === 'game' && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -376,7 +403,7 @@ function StatsSection({
         <button
           onClick={exportData}
           disabled={exportLoading}
-          className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:shadow-blue-500/25 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <FaDownload className={`w-4 h-4 ${exportLoading ? 'animate-spin' : ''}`} />
           <span>{exportLoading ? 'Exporting...' : 'Export All Data'}</span>
@@ -433,17 +460,17 @@ function StatsContent({ stats }: { stats: GameStats }) {
   // Calculate win/loss ratio with proper handling of edge cases
   const calculateWinLossRatio = (wins: number | string, losses: number | string): number => {
     console.log('Raw wins:', wins, 'Raw losses:', losses);
-    
+
     // Convert string numbers with commas to actual numbers if needed
     const cleanWins = typeof wins === 'string' ? parseInt(wins.replace(/,/g, ''), 10) : wins;
     const cleanLosses = typeof losses === 'string' ? parseInt(losses.replace(/,/g, ''), 10) : losses;
-    
+
     console.log('Cleaned wins:', cleanWins, 'Cleaned losses:', cleanLosses);
 
     if (cleanLosses === 0) {
       return cleanWins > 0 ? 999.99 : 0;
     }
-    
+
     const ratio = cleanWins / cleanLosses;
     console.log('Calculated ratio:', ratio);
     return Number(ratio.toFixed(2));
@@ -642,14 +669,12 @@ function BottomNav() {
       icon: <FaTwitter className="h-full w-full text-white" />,
     },
   ];
-
   return (
-    <div className="fixed bottom-0 left-0 right-0 flex justify-center pb-6">
+<div className="fixed bottom-0 left-0 right-0 flex justify-center pb-6">
       <FloatingDock 
         items={navItems}
         desktopClassName="hidden md:flex"
         mobileClassName="block md:hidden"
       />
-    </div>
-  );
-}
+    </div>  
+    )}
