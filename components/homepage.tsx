@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence, animate } from 'framer-motion'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
-import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle, FaSync } from 'react-icons/fa'
+import { FaClock, FaCalendarAlt, FaChartLine, FaDice, FaQuestionCircle, FaInfoCircle, FaExclamationTriangle, FaSync, FaDownload } from 'react-icons/fa'
 import { FaHome, FaTelegram, FaYoutube, FaTwitter } from 'react-icons/fa'
 import { IconType } from 'react-icons'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -37,6 +37,7 @@ const games = [
   'Baccarat', 'Blackjack', 'Crash', 'Diamonds', 'Dice', 'Hilo', 'Keno', 'Limbo', 
   'Mines', 'Plinko', 'Roulette', 'Slide', 'Wheel'
 ]
+
 
 function AnimatedNumber({ value, isRatio = false }: { value: number | string, isRatio?: boolean }) {
   const [displayValue, setDisplayValue] = useState(0);
@@ -213,9 +214,9 @@ export default function StakeStats() {
                   fetchStats={fetchStats}
                 />
               )}
-              {activeTab === 'help' && <InfoCard title="Help & Support" icon={FaQuestionCircle} />}
-              {activeTab === 'realities' && <InfoCard title="Realities" icon={FaExclamationTriangle} />}
-              {activeTab === 'about' && <InfoCard title="About Us" icon={FaInfoCircle} />}
+              {activeTab === 'help' && <InfoCard title="Help & Support" icon={FaQuestionCircle} value={''} />}
+              {activeTab === 'realities' && <InfoCard title="Realities" icon={FaExclamationTriangle} value={''} />}
+              {activeTab === 'about' && <InfoCard title="About Us" icon={FaInfoCircle} value={''} />}
             </motion.div>
           </AnimatePresence>
         </Tabs>
@@ -258,6 +259,88 @@ function StatsSection({
   error,
   fetchStats
 }: StatsSectionProps) {
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const fetchGameStats = async (game: string) => {
+    try {
+      const response = await fetch(`/api/proxy/stats/game/${timeframe}/${game.toLowerCase()}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      if (!response.ok) throw new Error(`Error fetching ${game} stats`);
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching ${game} stats:`, error);
+      return null;
+    }
+  };
+
+  const exportData = async () => {
+    if (!stats) return;
+    setExportLoading(true);
+
+    try {
+      // Fetch stats for all games
+      const gameStats = await Promise.all(
+        games.map(async (game) => ({
+          game,
+          stats: await fetchGameStats(game)
+        }))
+      );
+
+      // Create CSV content
+      const csvRows = [
+        ['Stake Statistics Export'],
+        ['Generated at:', new Date().toLocaleString()],
+        ['Timeframe:', timeframe],
+        [''],
+        ['Overall Statistics'],
+        ['Metric', 'Value', 'Percentage'],
+        ['Games Played', stats.gamesPlayed.toLocaleString(), ''],
+        ['Wins', stats.wins.toLocaleString(), `${stats.winPercentage}%`],
+        ['Losses', stats.losses.toLocaleString(), `${stats.lossPercentage}%`],
+        ['Win/Loss Ratio', (stats.wins / stats.losses).toFixed(2), ''],
+        [''],
+        ['Individual Game Statistics'],
+        ['Game', 'Games Played', 'Wins', 'Losses', 'Win %', 'Loss %', 'Win/Loss Ratio']
+      ];
+
+      // Add stats for each game
+      gameStats.forEach(({ game, stats: gameData }) => {
+        if (gameData) {
+          const ratio = gameData.losses > 0 ? (gameData.wins / gameData.losses).toFixed(2) : gameData.wins > 0 ? '∞' : '0.00';
+          csvRows.push([
+            game,
+            gameData.gamesPlayed.toLocaleString(),
+            gameData.wins.toLocaleString(),
+            gameData.losses.toLocaleString(),
+            `${gameData.winPercentage}%`,
+            `${gameData.lossPercentage}%`,
+            ratio
+          ]);
+        }
+      });
+
+      const csvContent = csvRows.map(row => row.join(',')).join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `stake-complete-stats-${timeframe}-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     await fetchStats();
   };
@@ -315,6 +398,14 @@ function StatsSection({
         >
           <FaSync className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+        </button>
+        <button
+          onClick={exportData}
+          disabled={exportLoading}
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FaDownload className={`w-4 h-4 ${exportLoading ? 'animate-spin' : ''}`} />
+          <span>{exportLoading ? 'Exporting...' : 'Export All Data'}</span>
         </button>
       </div>
 
@@ -528,29 +619,29 @@ function StatCard({ title, value, percentage, icon: Icon, trend, isRatio }: Stat
 }
 
 interface InfoCardProps {
-  title: string
-  icon: IconType
+  title: string;
+  value: string | number;
+  icon: IconType;
+  isRatio?: boolean;
 }
 
-function InfoCard({ title, icon: Icon }: InfoCardProps) {
+function InfoCard({ title, value, icon: Icon, isRatio = false }: InfoCardProps) {
+  let displayValue = value;
+  if (typeof value === 'string') {
+    // Remove commas and convert to number if it's a string with commas
+    displayValue = value.replace(/,/g, '');
+  }
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Card className="bg-gray-800/30 border-gray-700/50 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Icon className="w-5 h-5" />
-            {title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-400">Content for {title} will be added here.</p>
-        </CardContent>
-      </Card>
-    </motion.div>
+    <Card className="bg-gray-800/30 backdrop-blur-sm border-0">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-gray-400">{title}</CardTitle>
+        <Icon className="w-4 h-4 text-gray-400" />
+      </CardHeader>
+      <CardContent>
+        <AnimatedNumber value={displayValue} isRatio={isRatio} />
+      </CardContent>
+    </Card>
   )
 }
 
