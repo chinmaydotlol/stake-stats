@@ -134,7 +134,7 @@ export default function StakeStats() {
   useEffect(() => {
     fetchStats()
 
-    const intervalId = setInterval(fetchStats, 60000) // Update every 45 seconds
+    const intervalId = setInterval(fetchStats, 60000) // Update every 60 seconds
 
     return () => {
       clearInterval(intervalId)
@@ -166,61 +166,20 @@ export default function StakeStats() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white overflow-hidden relative">
+    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden">
       <AnimatedBackground />
-      <div className="relative z-10 max-w-7xl mx-auto p-8">
-        <motion.div
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12"
-        >
-          <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-            Stake.com Statistics
-          </h1>
-          <p className="text-gray-400">Unveiling the truth behind the numbers</p>
-        </motion.div>
-
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid grid-cols-5 max-w-2xl mx-auto bg-gray-800/30 backdrop-blur-sm rounded-full mb-8 p-1">
-            {['overall', 'game', 'help', 'realities', 'about'].map((tab) => (
-              <TabsTrigger
-                key={tab}
-                value={tab}
-                className="rounded-full transition-all duration-300 text-white data-[state=active]:bg-white/10 data-[state=active]:text-white"
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-            >
-              {(activeTab === 'overall' || activeTab === 'game') && (
-                <StatsSection
-                  timeframe={timeframe}
-                  setTimeframe={handleTimeframeChange}
-                  stats={stats}
-                  selectedGame={selectedGame}
-                  setSelectedGame={handleGameChange}
-                  activeTab={activeTab}
-                  loading={loading}
-                  error={error}
-                  fetchStats={fetchStats}
-                />
-              )}
-              {activeTab === 'help' && <InfoCard title="Help & Support" icon={FaQuestionCircle} value={''} />}
-              {activeTab === 'realities' && <InfoCard title="Realities" icon={FaExclamationTriangle} value={''} />}
-              {activeTab === 'about' && <InfoCard title="About Us" icon={FaInfoCircle} value={''} />}
-            </motion.div>
-          </AnimatePresence>
-        </Tabs>
+      <div className="container mx-auto px-4 py-8 relative z-10">
+        <StatsSection
+          timeframe={timeframe}
+          setTimeframe={setTimeframe}
+          stats={stats}
+          selectedGame={selectedGame}
+          setSelectedGame={setSelectedGame}
+          activeTab={activeTab}
+          loading={loading}
+          error={error}
+          fetchStats={fetchStats}
+        />
         <BottomNav />
       </div>
     </div>
@@ -348,6 +307,20 @@ function StatsSection({
 
   return (
     <div className="space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-8"
+      >
+        <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+          Stake.com Statistics
+        </h1>
+        <p className="text-gray-400 mb-2">Unveiling the truth behind the numbers</p>
+        <div className="text-sm text-gray-400 mt-4">
+          Made by <a href="https://discord.gg/v9suegvMpY" className="underline decoration-gray-400 hover:text-gray-300">nexora.dev</a> with ❤️
+        </div>
+      </motion.div>
+
       {activeTab === 'game' && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
