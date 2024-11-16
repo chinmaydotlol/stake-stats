@@ -558,8 +558,8 @@ function StatsContent({ stats }: { stats: GameStats }) {
                         contentStyle={{ background: 'rgba(39, 114, 245, 0.8)', border: 'none' }}
                         labelStyle={{ color: '#fff' }}
                         cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
-                        formatter={(value) => [parseInt(String(value)), 'Count']}
-                      />
+                        formatter={(value) => [`${parseInt(String(value))}k`, 'Count']}
+                        />
                       <Bar 
                         dataKey="value" 
                         fill="url(#barGradient)"
